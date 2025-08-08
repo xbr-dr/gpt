@@ -27,10 +27,50 @@ from openpyxl import load_workbook
 # to allow faster incremental testing if you want to run partial batches.
 
 
+
+# ------------------- Batch 3: File processing, extraction, chunking, indexing -------------------
+from typing import Iterable
+# ------------------- Batch 4: Intent classification, retrieval, re-ranking, LLM prompt -------------------
+import datetime
+import hashlib
+import math
+# ------------------- Batch 5: Map UI, folium integration, map mode toggle & focus -------------------
+import folium
+from streamlit_folium import st_folium
+from geopy.distance import geodesic
+# ------------------- Batch 6: UI pages (User & Admin) and main app wiring -------------------
+import uuid
+import glob
+# ------------------- Batch 7: UI polish, structured prompts, admin utilities -------------------
+import html
+import time as _time
 import streamlit as st
 GROQ_API_KEY = st.secrets["GROQ_API_KEY"]
 
+# ------------------- Batch 2: Models, NLTK, LangDetect, Location loading -------------------
+import threading
+from langdetect import detect, DetectorFactory, LangDetectException
 
+# Try to import optional fast fuzzy library (rapidfuzz). Fallback to difflib if not available.
+try:
+    from rapidfuzz import fuzz, process
+    RAPIDFUZZ_AVAILABLE = True
+except Exception:
+    from difflib import get_close_matches
+    RAPIDFUZZ_AVAILABLE = False
+
+# ML model & Groq imports (may be heavy)
+try:
+    from sentence_transformers import SentenceTransformer
+except Exception as e:
+    SentenceTransformer = None
+    _log_debug(f"SentenceTransformer import failed: {e}")
+
+try:
+    from groq import Groq
+except Exception as e:
+    Groq = None
+    _log_debug(f"Groq import failed: {e}")
 # ------------------- Configuration -------------------
 # Directories
 BASE_DIR = Path.cwd()
@@ -85,30 +125,7 @@ def _log_debug(msg: str):
 
 _log_debug("Batch 1 loaded: Header & Configuration")
 
-# ------------------- Batch 2: Models, NLTK, LangDetect, Location loading -------------------
-import threading
-from langdetect import detect, DetectorFactory, LangDetectException
 
-# Try to import optional fast fuzzy library (rapidfuzz). Fallback to difflib if not available.
-try:
-    from rapidfuzz import fuzz, process
-    RAPIDFUZZ_AVAILABLE = True
-except Exception:
-    from difflib import get_close_matches
-    RAPIDFUZZ_AVAILABLE = False
-
-# ML model & Groq imports (may be heavy)
-try:
-    from sentence_transformers import SentenceTransformer
-except Exception as e:
-    SentenceTransformer = None
-    _log_debug(f"SentenceTransformer import failed: {e}")
-
-try:
-    from groq import Groq
-except Exception as e:
-    Groq = None
-    _log_debug(f"Groq import failed: {e}")
 
 # Geopy & mapping libs will be imported in later batches when map rendering is added.
 
@@ -361,8 +378,7 @@ def fuzzy_match_location(query: str, location_map: Dict[str, Dict[str, Any]], sc
 
 _log_debug("Batch 2 loaded: Models (lazy), NLTK ready, Location loader ready")
 
-# ------------------- Batch 3: File processing, extraction, chunking, indexing -------------------
-from typing import Iterable
+
 
 # Helper: allowed file extensions
 ALLOWED_UPLOAD_TYPES = {'.pdf', '.txt', '.csv', '.xlsx', '.xls'}
@@ -692,10 +708,6 @@ def load_system_index_and_corpus() -> Tuple[Optional[faiss.Index], List[Dict[str
 
 _log_debug("Batch 3 loaded: file processing, extraction, chunking, index helpers")
 
-# ------------------- Batch 4: Intent classification, retrieval, re-ranking, LLM prompt -------------------
-import datetime
-import hashlib
-import math
 
 # ------------------- Chat session persistence -------------------
 def _session_filename(session_id: str) -> Path:
@@ -918,10 +930,7 @@ Provide a concise, factual response in {language}.
 _log_debug("Batch 4 loaded: Intent classification, retrieval, re-ranking, LLM prompt logic")
 
 
-# ------------------- Batch 5: Map UI, folium integration, map mode toggle & focus -------------------
-import folium
-from streamlit_folium import st_folium
-from geopy.distance import geodesic
+
 
 # Map tile options (label -> folium tile name)
 MAP_TILES = {
@@ -1070,9 +1079,7 @@ def compute_distance_between_two(l1: Dict[str,Any], l2: Dict[str,Any]) -> str:
 
 _log_debug("Batch 5 loaded: Map UI + folium helpers")
 
-# ------------------- Batch 6: UI pages (User & Admin) and main app wiring -------------------
-import uuid
-import glob
+
 
 # ------------ Helper UI bits ------------
 def _get_admin_password_input(key="admin_pass"):
@@ -1386,9 +1393,7 @@ def main():
 
 if __name__ == "__main__":
     main()
-# ------------------- Batch 7: UI polish, structured prompts, admin utilities -------------------
-import html
-import time as _time
+
 
 # ------------------- UI polishing (CSS & avatars) -------------------
 CHAT_CSS = """
