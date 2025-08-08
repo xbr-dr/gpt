@@ -101,9 +101,9 @@ SENTENCE_TRANSFORMER_MODEL = "distiluse-base-multilingual-cased-v1"
 GROQ_MODEL_NAME = "llama3-8b-8192"
 
 # Application settings
-MAX_RETRIEVE = 6              # number of RAG chunks to retrieve by default
-MIN_SENTENCE_LENGTH = 25      # minimum chars to keep a sentence during chunking
-MAX_CHAT_HISTORY_ITEMS = 200  # limit stored session messages to avoid bloat
+MAX_RETRIEVE = 6             # number of RAG chunks to retrieve by default
+MIN_SENTENCE_LENGTH = 25     # minimum chars to keep a sentence during chunking
+MAX_CHAT_HISTORY_ITEMS = 200 # limit stored session messages to avoid bloat
 
 # Behavior configuration: strict domain-only policy
 STRICT_DOMAIN_ONLY = True
@@ -967,7 +967,7 @@ def _build_marker_popup_html(loc: Dict[str, Any]) -> str:
     lon = loc['lon']
     name = loc.get('original_name', loc.get('name', 'Location'))
     desc = loc.get('desc', '')
-    maps_url = f"https://www.google.com/maps/dir/?api=1&destination={lat},{lon}"
+    maps_url = f"https://www.google.com/maps/search/?api=1&query={lat},{lon}"
     html = f"""
     <div style="width: 260px; font-family: Arial, sans-serif;">
       <h4 style="margin:0 0 6px 0;">{name}</h4>
@@ -975,7 +975,7 @@ def _build_marker_popup_html(loc: Dict[str, Any]) -> str:
       <div style="display:flex; gap:6px;">
         <a href="{maps_url}" target="_blank"
            style="padding:6px 10px; background:#1976d2; color:#fff; text-decoration:none; border-radius:4px; font-size:13px;">
-          Navigate (Google Maps)
+           Navigate (Google Maps)
         </a>
       </div>
     </div>
@@ -1043,7 +1043,7 @@ def show_location_ui(loc: Dict[str, Any], context_text: Optional[str] = None):
         if st.button("Focus on location"):
             # clicking this will simply re-render map centered on single loc (handled below by using last_map_location)
             st.session_state.last_map_location = loc
-            st.experimental_rerun()
+            st.rerun()
 
         st.markdown(f"**Coordinates:** `{loc['lat']:.6f}, {loc['lon']:.6f}`")
         if loc.get("desc"):
@@ -1105,7 +1105,7 @@ def admin_page():
             if pwd == ADMIN_PASSWORD:
                 st.session_state.admin_authenticated = True
                 st.success("Admin authenticated")
-                st.experimental_rerun()
+                st.rerun()
             else:
                 st.error("Incorrect password")
         return
@@ -1128,21 +1128,23 @@ def admin_page():
                     # Extract free-text location patterns from combined text
                     combined_text = " ".join([d['text'] for d in file_data])
                     text_locs = extract_locations_from_text(combined_text)
-                    # Merge location maps (file-structured -> text-found)
-                    merged_loc_map = {**LOCATION_MAP, **locs_from_files, **text_locs}
+                    
+                    # --- FIX START: Correctly merge locations ---
+                    # Load the most recent map from storage before merging to avoid overwriting with stale data.
+                    _idx, _corpus, current_loc_map = load_system_index_and_corpus()
+                    # Merge all sources: current -> from structured files -> from free text (later ones overwrite earlier ones on key collision)
+                    merged_loc_map = {**current_loc_map, **locs_from_files, **text_locs}
+                    # --- FIX END ---
+                    
                     # Build sentence chunks
                     chunks = extract_sentences_from_documents(file_data)
                     success, n_sentences, n_locs = build_and_save_index(chunks, merged_loc_map)
-                    # reload global location map cache
-                    try:
-                        # Update LOCATION_MAP persisted file and in-memory ref (simple approach)
-                        with open(LOCATION_DATA_PATH, "wb") as f:
-                            pickle.dump(merged_loc_map, f)
-                        # refresh module-level cache (clear cached resource by re-calling get_location_map)
+                    
+                    if success:
+                        # Update the session state to reflect the changes immediately in the user chat.
                         st.session_state.location_map = merged_loc_map
-                        st.success(f"Processed: {n_sentences} knowledge items and {n_locs} locations.")
-                    except Exception as e:
-                        st.error(f"Error saving merged locations: {e}")
+                        st.success(f"Processing complete. Indexed {n_sentences} knowledge items. Total locations are now {n_locs}.")
+                    # build_and_save_index handles its own error reporting via st.error
 
     # --- Locations CSV Tab ---
     with tabs[1]:
@@ -1156,11 +1158,8 @@ def admin_page():
                 with open(save_path, "wb") as f:
                     f.write(uploaded_csv.getbuffer())
                 # Reload and persist processed pickle
-                new_map = load_locations_from_csv(save_path)
-                # update persisted pickle
-                with open(LOCATION_DATA_PATH, "wb") as f:
-                    pickle.dump(new_map, f)
-                # update runtime map
+                new_map = load_locations_from_csv(save_path) # This already saves the pickle
+                # update runtime map in session state for immediate availability
                 st.session_state.location_map = new_map
                 st.success(f"Saved and loaded {len(new_map)} locations.")
         # Allow quick preview
@@ -1251,7 +1250,7 @@ def user_page():
         """
         <div style="display:flex; align-items:center; justify-content:space-between;">
             <div style="display:flex; align-items:center; gap:12px;">
-                <h2 style="margin:0;">CampusGPT</h2>
+                <h2 style="margin:0;">CampusGPT — Your Campus Assistant</h2>
                 <span style="color:gray;">Ask about campus locations, services, departments, and policies.</span>
             </div>
             <div>
@@ -1262,19 +1261,21 @@ def user_page():
         """, unsafe_allow_html=True
     )
 
-    # Hide sidebar for users to keep UI clean
-    st.experimental_set_query_params()  # noop to stabilize ui layout; sidebar hidden by default as configured earlier
+    # --- FIX START: Replace deprecated function and simplify state management ---
+    # Hide sidebar for users to keep UI clean and clear params to stabilize state.
+    st.query_params.clear()
 
     # Load system artifacts
     index, corpus, persisted_locs = load_system_index_and_corpus()
-    # prefer session location_map if admin just uploaded
-    runtime_loc_map = st.session_state.get("location_map", None) or (persisted_locs or LOCATION_MAP or {})
-    # if everything empty -> show no data message
+    # Prefer session_state map if admin updated it in this session, otherwise use the latest persisted map.
+    runtime_loc_map = st.session_state.get("location_map", persisted_locs)
+    # Check if the system has any data to work with.
     system_ready = (index is not None and corpus) or bool(runtime_loc_map)
+    # --- FIX END ---
 
     if not system_ready:
         st.markdown("### ⚠️ No campus data available")
-        st.info("No campus data available. Please contact admin.")
+        st.info("The system has not been configured with campus data yet. Please contact an administrator to upload documents and location information.")
         return
 
     # Setup session id & history
@@ -1384,7 +1385,7 @@ def main():
             if "chat_history" in st.session_state:
                 st.session_state.chat_history = []
                 save_chat_session(st.session_state.session_id, [])
-                st.experimental_rerun()
+                st.rerun()
 
     if mode == "Admin Portal":
         admin_page()
