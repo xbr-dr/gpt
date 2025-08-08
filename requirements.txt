@@ -1,0 +1,12 @@
+streamlit
+pandas
+faiss-cpu
+groq
+langchain
+langchain-community
+langchain-text-splitters
+python-dotenv
+PyPDF2
+openpyxl
+textblob
+geopy
