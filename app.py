@@ -26,6 +26,11 @@ from openpyxl import load_workbook
 # Optional: sentence-transformers, geopy, folium, groq will be imported in Batch 2
 # to allow faster incremental testing if you want to run partial batches.
 
+
+import streamlit as st
+GROQ_API_KEY = st.secrets["GROQ_API_KEY"]
+
+
 # ------------------- Configuration -------------------
 # Directories
 BASE_DIR = Path.cwd()
