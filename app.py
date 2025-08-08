@@ -1263,7 +1263,7 @@ def user_page():
     )
 
     # Hide sidebar for users to keep UI clean
-    st.query_params()  # noop to stabilize ui layout; sidebar hidden by default as configured earlier
+    st.experimental_set_query_params()  # noop to stabilize ui layout; sidebar hidden by default as configured earlier
 
     # Load system artifacts
     index, corpus, persisted_locs = load_system_index_and_corpus()
