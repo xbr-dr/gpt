@@ -1251,7 +1251,7 @@ def user_page():
         """
         <div style="display:flex; align-items:center; justify-content:space-between;">
             <div style="display:flex; align-items:center; gap:12px;">
-                <h2 style="margin:0;">CampusGPT — Your Campus Assistant</h2>
+                <h2 style="margin:0;">CampusGPT</h2>
                 <span style="color:gray;">Ask about campus locations, services, departments, and policies.</span>
             </div>
             <div>
